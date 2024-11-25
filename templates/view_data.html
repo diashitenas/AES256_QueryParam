@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>View Data</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css">
+</head>
+<body>
+    <div class="container">
+        <h2 class="text-center mt-5">View Data</h2>
+        <table class="table table-bordered mt-3">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>DNA Sequence</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for data in dna_data %}
+                <tr>
+                    <td>{{ data.id }}</td>
+                    <td>{{ data.name }}</td>
+                    <td>{{ data.dna_sequence }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <a href="/logout" class="btn btn-secondary btn-block mt-3">Logout</a>
+        {% with messages = get_flashed_messages() %}
+        {% if messages %}
+        <div class="alert alert-success mt-3">
+            {% for message in messages %}
+            <p>{{ message }}</p>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% endwith %}
+    </div>
+</body>
+</html>
