@@ -1,144 +1,120 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, session
-import mysql.connector
-from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-from cryptography.hazmat.primitives import padding
-from cryptography.hazmat.backends import default_backend
-import base64
-import os
+# DNA Sequence Management System with AES-256 Encryption
 
-app = Flask(__name__)
-app.secret_key = 'informatika'
+A secure web application for managing DNA sequence data using Flask and AES-256 encryption. This system provides role-based access control and encrypted storage of sensitive DNA sequence information.
 
-# Fungsi untuk memuat kunci dari file
-def load_key():
-    return open("secret.key", "rb").read()
+## Features
 
-key = load_key()
+- **Secure Authentication**
+  - Role-based access control (Researcher and User roles)
+  - Session management
+  - Protected routes
 
+- **Data Security**
+  - AES-256 encryption for DNA sequences
+  - GCM mode for authenticated encryption
+  - Secure key management
+  - Query parameterization for SQL injection prevention
 
-def encrypt(data, key):
-    padder = padding.PKCS7(algorithms.AES.block_size).padder()
-    padded_data = padder.update(data) + padder.finalize()
-    iv = os.urandom(12) 
-    cipher = Cipher(algorithms.AES(key), modes.GCM(iv), backend=default_backend())
-    encryptor = cipher.encryptor()
-    ciphertext = encryptor.update(padded_data) + encryptor.finalize()
-    encrypted_data = iv + encryptor.tag + ciphertext
-    return base64.b64encode(encrypted_data).decode('utf-8')
+- **User Interface**
+  - Clean and responsive Bootstrap-based UI
+  - Separate interfaces for data input and viewing
+  - Flash messages for user feedback
 
-# Fungsi untuk mendekripsi data
-def decrypt(encrypted_data, key):
-    # Decode dari base64
-    encrypted_data = base64.b64decode(encrypted_data)
-    
-    # Ekstrak iv, tag, dan ciphertext
-    iv = encrypted_data[:12]
-    tag = encrypted_data[12:28]
-    ciphertext = encrypted_data[28:]
-    
-    # Buat cipher
-    cipher = Cipher(algorithms.AES(key), modes.GCM(iv, tag), backend=default_backend())
-    decryptor = cipher.decryptor()
-    
-    # Dekripsi data
-    padded_data = decryptor.update(ciphertext) + decryptor.finalize()
-    
-    # Unpad data
-    unpadder = padding.PKCS7(algorithms.AES.block_size).unpadder()
-    data = unpadder.update(padded_data) + unpadder.finalize()
-    
-    return data
+## Technology Stack
 
-# Koneksi database
-def get_db_connection():
-    return mysql.connector.connect(
-        host='localhost',
-        user='root',
-        password='1234',
-        database='dna_database'
-    )
+- **Backend**: Python Flask
+- **Database**: MySQL
+- **Encryption**: AES-256-GCM using cryptography library
+- **Frontend**: HTML, Bootstrap 4
+- **Security Features**: Session management, Password protection
 
-@app.route('/')
-def login():
-    return render_template('login.html')
+## Setup
 
-@app.route('/login', methods=['POST'])
-def do_login():
-    username = request.form['username']
-    password = request.form['password']
-    
-    db = get_db_connection()
-    cursor = db.cursor(dictionary=True)
-    query = "SELECT * FROM users WHERE username=%s AND password=%s"
-    cursor.execute(query, (username, password))
-    user = cursor.fetchone()
-    
-    if user:
-        session['user_id'] = user['id']
-        session['role'] = user['role']
-        
-        if user['role'] == 'researcher':
-            return redirect(url_for('input_data'))
-        else:
-            return redirect(url_for('view_data'))
-    else:
-        flash('Invalid username or password')
-        return redirect(url_for('login'))
+1. Create a virtual environment and activate it:
+```bash
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+venv\Scripts\activate     # Windows
+```
 
-@app.route('/input_data')
-def input_data():
-    if 'role' in session and session['role'] == 'researcher':
-        return render_template('input_data.html')
-    else:
-        return redirect(url_for('login'))
+2. Install required dependencies:
+```bash
+pip install flask mysql-connector-python cryptography
+```
 
-@app.route('/submit_data', methods=['POST'])
-def submit_data():
-    if 'role' in session and session['role'] == 'researcher':
-        name = request.form['name']
-        dna_sequence = request.form['dna_sequence']
-        encrypted_dna = encrypt(dna_sequence.encode(), key)
-        
-        db = get_db_connection()
-        cursor = db.cursor()
-        query = "INSERT INTO dna_data (name, dna_sequence) VALUES (%s, %s)"
-        cursor.execute(query, (name, encrypted_dna))
-        db.commit()
-        
-        flash('Data berhasil diinput')
-        return redirect(url_for('input_data'))
-    else:
-        return redirect(url_for('login'))
+3. Setup the MySQL database:
+```sql
+CREATE DATABASE dna_database;
 
-@app.route('/view_data')
-def view_data():
-    if 'role' in session and session['role'] == 'user':
-        db = get_db_connection()
-        cursor = db.cursor(dictionary=True)
-        cursor.execute("SELECT * FROM dna_data")
-        dna_data = cursor.fetchall()
-        
-        decrypted_data = []
-        for data in dna_data:
-            try:
-                decrypted_dna = decrypt(data['dna_sequence'], key).decode()
-                decrypted_data.append({
-                    'id': data['id'],
-                    'name': data['name'],
-                    'dna_sequence': decrypted_dna
-                })
-            except Exception as e:
-                flash('Failed to decrypt data: {}'.format(e))
-        
-        return render_template('view_data.html', dna_data=decrypted_data)
-    else:
-        return redirect(url_for('login'))
+CREATE TABLE users (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(255),
+    password VARCHAR(255),
+    role VARCHAR(50)
+);
 
-@app.route('/logout')
-def logout():
-    session.clear()
-    flash('Anda berhasil logout')
-    return redirect(url_for('login'))
+CREATE TABLE dna_data (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255),
+    dna_sequence TEXT
+);
+```
 
-if __name__ == '__main__':
-    app.run(debug=True)
+4. Generate encryption key:
+```bash
+python key.py
+```
+
+5. Configure database connection in app.py:
+```python
+host='localhost'
+user='your_username'
+password='your_password'
+database='dna_database'
+```
+
+## Usage
+
+1. Run the application:
+```bash
+python app.py
+```
+
+2. Access the application at `http://localhost:5000`
+
+3. Log in with appropriate credentials:
+   - Researchers can input new DNA sequences
+   - Users can view encrypted DNA sequences
+
+## Security Features
+
+- **Encryption**: Uses AES-256-GCM for DNA sequence encryption
+- **Key Management**: Secure key storage in separate file
+- **Authentication**: Role-based access control
+- **Database Security**: Parameterized queries to prevent SQL injection
+- **Session Management**: Secure session handling with Flask
+
+## Project Structure
+
+```
+├── app.py              # Main application file
+├── key.py             # Key generation script
+├── secret.key         # Encryption key storage
+├── templates/         # HTML templates
+│   ├── login.html    # Login page
+│   ├── input_data.html  # Data input interface
+│   └── view_data.html   # Data viewing interface
+└── README.md
+```
+
+## Contributing
+
+1. Fork the repository
+2. Create your feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a new Pull Request
+
+## License
+
+This project is open source and available under the [MIT License](LICENSE).
